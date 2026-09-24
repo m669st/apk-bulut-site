@@ -137,6 +137,32 @@
   }
   #cubuk button:active { background: #222; }
   #cubuk #kapatOynatici { color: #e0726b; margin-left: 12px; }
+
+  /* Nötr ikincil düğme */
+  button.notr {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--line); margin-top: 10px; font-weight: 500;
+  }
+  button.notr span { color: var(--muted); font-weight: 400; }
+
+  /* Görüntü ayarları paneli (oynatıcının da üstünde) */
+  #ayarPanel {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0, 0, 0, .55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  #ayarPanel .panel {
+    width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  }
+  .hazirlar { display: flex; gap: 8px; margin: 12px 0 4px; }
+  .hazirlar button {
+    flex: 1; width: auto; margin: 0; min-height: 40px; padding: 8px;
+    background: var(--field); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; font-weight: 500;
+  }
+  .hazirlar button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); }
   /* Yatayken kontrol çubuğunu yana al ki ekranın tamamı video olsun */
   @media (orientation: landscape) {
     #oynatici { flex-direction: row; }
@@ -173,6 +199,7 @@
     <label for="apk">APK linki (isteğe bağlı)</label>
     <input id="apk" type="url" inputmode="url" placeholder="https://…/uygulama.apk" autocapitalize="off" spellcheck="false">
     <button id="baslatBtn">Başlat</button>
+    <button type="button" class="notr ayarAcBtn">Görüntü ayarları · <span class="ayarOzet"></span></button>
     <p class="hata" id="baslatHata"></p>
     <p class="not">Depodaki <code>apks/</code> klasöründeki APK'lar her oturumda otomatik kurulur. Hazırlık 3–5 dakika sürer.</p>
   </section>
@@ -183,6 +210,7 @@
     <p class="durum-alt" id="durumAlt"></p>
     <ul class="adimlar" id="adimlar"></ul>
     <button id="acBtn" class="btn" hidden>Android'i aç</button>
+    <button id="ayarAcBtn" class="notr ayarAcBtn">Görüntü ayarları · <span class="ayarOzet"></span></button>
     <button id="durdurBtn" class="ikincil">Durdur</button>
     <p class="hata" id="oturumHata"></p>
     <p class="not"><a id="runLink" target="_blank" rel="noopener">GitHub'da ayrıntılar</a></p>
@@ -198,7 +226,57 @@
     <button data-tus="son" title="Son uygulamalar" aria-label="Son uygulamalar">▢</button>
     <button data-tus="ana" title="Ana ekran" aria-label="Ana ekran">◯</button>
     <button data-tus="geri" title="Geri" aria-label="Geri">◁</button>
+    <button id="ayarCubukBtn" title="Görüntü ayarları" aria-label="Görüntü ayarları">⚙</button>
     <button id="kapatOynatici" title="Kapat" aria-label="Kapat">✕</button>
+  </div>
+</div>
+
+<!-- Görüntü ayarları: bağlanırken ve bağlıyken açılabilir -->
+<div id="ayarPanel" hidden role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
+  <div class="panel">
+    <p class="durum-baslik" id="ayarBaslik">Görüntü ayarları</p>
+    <div class="hazirlar" id="hazirlar">
+      <button type="button" data-hazir="akici">Akıcı</button>
+      <button type="button" data-hazir="dengeli">Dengeli</button>
+      <button type="button" data-hazir="kaliteli">Kaliteli</button>
+    </div>
+    <label for="ayCozunurluk">Android çözünürlüğü</label>
+    <select id="ayCozunurluk">
+      <option value="432">Düşük · 432×936</option>
+      <option value="540">Orta · 540×1170</option>
+      <option value="720">Yüksek · 720×1560</option>
+    </select>
+    <label for="ayFps">Kare hızı</label>
+    <select id="ayFps">
+      <option value="15">15 FPS</option>
+      <option value="24">24 FPS</option>
+      <option value="30">30 FPS</option>
+      <option value="45">45 FPS</option>
+      <option value="60">60 FPS</option>
+    </select>
+    <label for="ayBit">Bit hızı</label>
+    <select id="ayBit">
+      <option value="1000000">1 Mbit/s</option>
+      <option value="2000000">2 Mbit/s</option>
+      <option value="4000000">4 Mbit/s</option>
+      <option value="6000000">6 Mbit/s</option>
+      <option value="8000000">8 Mbit/s</option>
+      <option value="12000000">12 Mbit/s</option>
+    </select>
+    <label for="ayAnim">Android animasyonları</label>
+    <select id="ayAnim">
+      <option value="0">Kapalı</option>
+      <option value="0.5">Hızlı</option>
+      <option value="1">Normal</option>
+    </select>
+    <label for="aySes">Ses</label>
+    <select id="aySes">
+      <option value="true">Açık</option>
+      <option value="false">Kapalı</option>
+    </select>
+    <p class="not">Kasma varsa önce çözünürlüğü ve kare hızını düşür. Animasyonları kapatmak arayüzü hızlandırır.</p>
+    <button type="button" id="ayarUygulaBtn" class="btn">Uygula</button>
+    <button type="button" id="ayarKapatBtn" class="notr">Vazgeç</button>
   </div>
 </div>
 
@@ -375,15 +453,99 @@
     p.set('codec', 'h264');                // emülatörde hızlı ve uyumlu
     p.set('encoder', 'c2.android.avc.encoder');
     p.set('deviceKind', 'phone');          // dokunmatik mod (yoksa TV kumandası moduna düşer)
-    p.set('audio', 'true');
-    p.set('maxFps', '60');
-    p.set('bitrate', '8000000');
+    p.set('audio', goruntu.ses);
+    p.set('maxFps', goruntu.fps);
+    p.set('bitrate', goruntu.bit);
     return u.toString();
   }
 
   async function ctl(yol) {
     if (!link || !link.taban) return;
-    try { await fetch(link.taban + '_ctl/' + yol, { cache: 'no-store', mode: 'cors' }); } catch { /* yut */ }
+    const iptal = new AbortController();
+    const zaman = setTimeout(() => iptal.abort(), 6000);
+    try {
+      await fetch(link.taban + '_ctl/' + yol, { cache: 'no-store', mode: 'cors', signal: iptal.signal });
+    } catch { /* yut: ayar uygulanamazsa akış yine açılır */ } finally {
+      clearTimeout(zaman);
+    }
+  }
+
+  // ---- Görüntü ayarları ----
+  const GORUNTU_ANAHTAR = 'apk-bulut-goruntu';
+  const HAZIRLAR = {
+    akici:    { cozunurluk: '432', fps: '30', bit: '2000000', anim: '0',   ses: 'true' },
+    dengeli:  { cozunurluk: '540', fps: '30', bit: '4000000', anim: '0.5', ses: 'true' },
+    kaliteli: { cozunurluk: '720', fps: '60', bit: '8000000', anim: '1',   ses: 'true' },
+  };
+  const HAZIR_ADLARI = { akici: 'Akıcı', dengeli: 'Dengeli', kaliteli: 'Kaliteli' };
+  const ALANLAR = { cozunurluk: 'ayCozunurluk', fps: 'ayFps', bit: 'ayBit', anim: 'ayAnim', ses: 'aySes' };
+
+  const gecerliMi = (alan, deger) => [...$(ALANLAR[alan]).options].some((o) => o.value === deger);
+
+  function goruntuOku() {
+    const v = { ...HAZIRLAR.dengeli };
+    let k = null;
+    try { k = JSON.parse(localStorage.getItem(GORUNTU_ANAHTAR)); } catch { /* yok say */ }
+    if (k && typeof k === 'object') {
+      for (const a of Object.keys(ALANLAR)) {
+        if (typeof k[a] === 'string' && gecerliMi(a, k[a])) v[a] = k[a];
+      }
+    }
+    return v;
+  }
+  let goruntu = goruntuOku();
+
+  const hazirAdi = (v) => Object.keys(HAZIRLAR).find((h) => Object.keys(ALANLAR).every((a) => HAZIRLAR[h][a] === v[a])) || null;
+
+  function panelOku() {
+    const v = {};
+    for (const [a, id] of Object.entries(ALANLAR)) v[a] = $(id).value;
+    return v;
+  }
+  function paneleYaz(v) {
+    for (const [a, id] of Object.entries(ALANLAR)) $(id).value = v[a];
+    hazirIsaretle();
+  }
+  function hazirIsaretle() {
+    const h = hazirAdi(panelOku());
+    document.querySelectorAll('#hazirlar button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.hazir === h));
+    });
+  }
+  function ozetYaz() {
+    const h = hazirAdi(goruntu);
+    const metin = h ? HAZIR_ADLARI[h] : 'Özel · ' + goruntu.fps + ' FPS';
+    document.querySelectorAll('.ayarOzet').forEach((e) => { e.textContent = metin; });
+  }
+
+  function ayarPanelAc() { paneleYaz(goruntu); $('ayarPanel').hidden = false; }
+  function ayarPanelKapat() { $('ayarPanel').hidden = true; }
+
+  document.querySelectorAll('.ayarAcBtn').forEach((b) => b.addEventListener('click', ayarPanelAc));
+  $('ayarCubukBtn').addEventListener('click', ayarPanelAc);
+  $('ayarKapatBtn').addEventListener('click', ayarPanelKapat);
+  $('ayarPanel').addEventListener('click', (e) => { if (e.target === $('ayarPanel')) ayarPanelKapat(); });
+  document.querySelectorAll('#hazirlar button').forEach((b) => {
+    b.addEventListener('click', () => paneleYaz(HAZIRLAR[b.dataset.hazir]));
+  });
+  Object.values(ALANLAR).forEach((id) => $(id).addEventListener('change', hazirIsaretle));
+  $('ayarUygulaBtn').addEventListener('click', () => {
+    goruntu = panelOku();
+    try { localStorage.setItem(GORUNTU_ANAHTAR, JSON.stringify(goruntu)); } catch { /* özel pencere */ }
+    ozetYaz();
+    ayarPanelKapat();
+    if (!$('oynatici').hidden) akisiBaslat();   // bağlıyken: yeni ayarlarla yeniden bağlan
+  });
+  ozetYaz();
+
+  // Android tarafı ayarları (çözünürlük, animasyon) önce uygulanır; akış yeni boyutla başlar.
+  let akisSayaci = 0;
+  async function akisiBaslat() {
+    const bu = ++akisSayaci;
+    $('ekran').src = 'about:blank';
+    await Promise.all([ctl('ekran?g=' + goruntu.cozunurluk), ctl('anim?o=' + goruntu.anim)]);
+    if (bu !== akisSayaci || $('oynatici').hidden) return;   // bu arada kapatıldı ya da yeniden başlatıldı
+    $('ekran').src = embedUrl();
   }
 
   function yonBildir() {
@@ -399,9 +561,9 @@
 
   function oynaticiAc() {
     if (!link || !link.taban) return;
-    $('ekran').src = embedUrl();
     $('oynatici').hidden = false;
     document.addEventListener('fullscreenchange', tamEkranKontrol);
+    // Tam ekran isteği kullanıcı tıklamasıyla eşzamanlı olmalı; bekleme öncesinde yapılır.
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -411,6 +573,7 @@
       window.addEventListener('orientationchange', yonBildir);
     }
     yonBildir();
+    akisiBaslat();
   }
 
   function oynaticiKapat() {
