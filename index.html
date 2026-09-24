@@ -192,8 +192,10 @@
   const $ = (id) => document.getElementById(id);
   let ayar = oku();
   if (GIZLI) ayar.repo = GIZLI.repo;
+  if (!ayar.jwk || !ayar.pub) ayar = { repo: ayar.repo };   // eski/eksik kayıt: şifre yeniden sorulur
   let run = null;          // aktif iş akışı çalıştırması
   let durum = null;        // son commit durumu
+  let link = null;         // { muhur, url } — çözülmüş oturum linki
   let yoklamaZamani = null;
   let durduruluyor = false;
 
@@ -259,16 +261,16 @@
     if (!sifre) return;
     $('kaydet').disabled = true;
     $('kaydet').textContent = 'Kontrol ediliyor…';
-    let token;
+    let acik;
     try {
-      token = await jetonuCoz(sifre);
+      acik = JSON.parse(await jetonuCoz(sifre));
     } catch {
       $('kurulumHata').textContent = 'Şifre yanlış.';
       $('kaydet').disabled = false;
       $('kaydet').textContent = 'Giriş';
       return;
     }
-    ayar = { repo: GIZLI.repo, token };
+    ayar = { repo: GIZLI.repo, token: acik.t, jwk: acik.k, pub: acik.p };
     try {
       const bilgi = await gh('/repos/' + ayar.repo);
       ayar.dal = bilgi.default_branch || 'main';
@@ -284,13 +286,50 @@
     }
   });
 
+  // ---- Oturum linki ----
+  // İş akışı linki bu cihazın açık anahtarına şifreler (scripts/muhurle.js):
+  // base64url( tek_kullanımlık_açık_anahtar[65] || AES-GCM şifreli metin ), metin = "mod|alt_alan|sır"
+  const b64u = (s) => b64(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+
+  async function muhruAc(muhur) {
+    const b = b64u(muhur);
+    if (b.length < 65 + 16 + 5) throw new Error('kısa mühür');
+    const ozel = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: ayar.jwk.x, y: ayar.jwk.y, d: ayar.jwk.d },
+      { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+    const tek = await crypto.subtle.importKey('raw', b.slice(0, 65), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const ortak = await crypto.subtle.deriveBits({ name: 'ECDH', public: tek }, ozel, 256);
+    const hk = await crypto.subtle.importKey('raw', ortak, 'HKDF', false, ['deriveBits']);
+    const km = new Uint8Array(await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode('apk-bulut') }, hk, 44 * 8));
+    const aes = await crypto.subtle.importKey('raw', km.slice(0, 32), 'AES-GCM', false, ['decrypt']);
+    const metin = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: km.slice(32) }, aes, b.slice(65)));
+    const [mod, alt, sir] = metin.split('|');
+    if (!/^[sh]$/.test(mod) || !/^[a-z0-9]+(-[a-z0-9]+)+$/.test(alt) || !/^[A-Za-z0-9_-]{16,64}$/.test(sir)) {
+      throw new Error('bozuk içerik');
+    }
+    return 'https://' + alt + '.trycloudflare.com/giris?k=' + sir;
+  }
+
+  async function linkiHazirla() {
+    const hedef = durum && durum.state === 'success' ? String(durum.target_url || '') : '';
+    const i = hedef.indexOf('#');
+    const muhur = i >= 0 ? hedef.slice(i + 1) : '';
+    if (!muhur) { link = null; return; }
+    if (link && link.muhur === muhur) return;
+    try {
+      link = { muhur, url: await muhruAc(muhur) };
+    } catch {
+      link = { muhur, url: null };
+    }
+  }
+
   $('ayarlarBtn').addEventListener('click', () => {
     cikis('');
   });
 
   function cikis(mesaj) {
     clearTimeout(yoklamaZamani);
-    run = null; durum = null;
+    run = null; durum = null; link = null;
     ayar = { repo: GIZLI && GIZLI.repo };
     try { localStorage.removeItem(ANAHTAR); } catch { /* yok say */ }
     goster('kurulum');
@@ -313,11 +352,12 @@
           inputs: {
             dakika: $('sure').value,
             goruntu: document.querySelector('input[name=goruntu]:checked').value,
+            anahtar: ayar.pub,
             apk_url: apk,
           },
         },
       });
-      run = null; durum = null; durduruluyor = false;
+      run = null; durum = null; link = null; durduruluyor = false;
       goster('oturum');
       ciz();
       // Yeni çalıştırmanın görünmesini bekle
@@ -373,6 +413,7 @@
       run = await gh('/repos/' + ayar.repo + '/actions/runs/' + run.id);
       const liste = await gh('/repos/' + ayar.repo + '/commits/' + run.head_sha + '/statuses?per_page=100');
       durum = liste.find((s) => s.context === 'android/' + run.id) || null;
+      await linkiHazirla();
       $('oturumHata').textContent = '';
     } catch (e) {
       $('oturumHata').textContent = e.message;
@@ -443,7 +484,7 @@
     $('durdurBtn').disabled = durduruluyor;
     $('durdurBtn').textContent = durduruluyor ? 'Durduruluyor…' : 'Durdur';
 
-    const hazir = durum && durum.state === 'success' && /^https:\/\//.test(durum.target_url || '');
+    const hazir = durum && durum.state === 'success' && link;
     if (hazir) {
       baslik.textContent = 'Android hazır';
       const bitis = bitisZamani();
@@ -454,9 +495,14 @@
       k.id = 'kalan';
       k.textContent = bitis ? sure(bitis - Date.now()) : '—';
       alt.append(k);
-      ac.href = durum.target_url;
-      ac.hidden = false;
       $('adimlar').innerHTML = '';
+      if (link.url) {
+        ac.href = link.url;
+        ac.hidden = false;
+      } else {
+        ac.hidden = true;
+        $('oturumHata').textContent = 'Oturum linki çözülemedi. Site şifresi yenilendiyse bu cihazda çıkış yapıp tekrar gir.';
+      }
     } else {
       const i = adimIndex();
       baslik.textContent = run.status === 'queued' && !durum ? 'Sırada' : ADIMLAR[i][1];
