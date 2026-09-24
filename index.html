@@ -118,6 +118,30 @@
   .not { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
   .not a { color: inherit; }
   [hidden] { display: none !important; }
+
+  /* Tam ekran oynatıcı */
+  #oynatici {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #000; display: flex; flex-direction: column;
+  }
+  #ekran { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: #000; }
+  #cubuk {
+    display: flex; justify-content: center; gap: 28px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    background: #0a0a0a; border-top: 1px solid #1c1c1c;
+  }
+  #cubuk button {
+    width: auto; min-height: 40px; margin: 0; padding: 6px 18px;
+    background: transparent; color: #e6e6e6; border: 0; border-radius: 8px;
+    font-size: 18px; line-height: 1; cursor: pointer;
+  }
+  #cubuk button:active { background: #222; }
+  #cubuk #kapatOynatici { color: #e0726b; margin-left: 12px; }
+  /* Yatayken kontrol çubuğunu yana al ki ekranın tamamı video olsun */
+  @media (orientation: landscape) {
+    #oynatici { flex-direction: row; }
+    #cubuk { flex-direction: column; border-top: 0; border-left: 1px solid #1c1c1c; padding: 12px 8px; }
+  }
 </style>
 </head>
 <body>
@@ -146,11 +170,6 @@
       <option value="180">3 saat</option>
       <option value="300">5 saat</option>
     </select>
-    <label>Görüntü</label>
-    <div class="seg">
-      <label><input type="radio" name="goruntu" value="standart" checked>Standart<small>noVNC, sessiz</small></label>
-      <label><input type="radio" name="goruntu" value="hd">HD<small>sesli, deneysel</small></label>
-    </div>
     <label for="apk">APK linki (isteğe bağlı)</label>
     <input id="apk" type="url" inputmode="url" placeholder="https://…/uygulama.apk" autocapitalize="off" spellcheck="false">
     <button id="baslatBtn">Başlat</button>
@@ -163,7 +182,7 @@
     <p class="durum-baslik" id="durumBaslik">Başlatılıyor</p>
     <p class="durum-alt" id="durumAlt"></p>
     <ul class="adimlar" id="adimlar"></ul>
-    <a id="acBtn" class="btn" target="_blank" rel="noopener" hidden>Android'i aç</a>
+    <button id="acBtn" class="btn" hidden>Android'i aç</button>
     <button id="durdurBtn" class="ikincil">Durdur</button>
     <p class="hata" id="oturumHata"></p>
     <p class="not"><a id="runLink" target="_blank" rel="noopener">GitHub'da ayrıntılar</a></p>
@@ -171,6 +190,17 @@
 
   <button id="ayarlarBtn" class="link" hidden>Bu cihazda çıkış yap</button>
 </main>
+
+<!-- Tam ekran oynatıcı: akış burada iframe ile gömülür -->
+<div id="oynatici" hidden>
+  <iframe id="ekran" allow="autoplay; fullscreen; clipboard-write" title="Android"></iframe>
+  <div id="cubuk">
+    <button data-tus="son" title="Son uygulamalar" aria-label="Son uygulamalar">▢</button>
+    <button data-tus="ana" title="Ana ekran" aria-label="Ana ekran">◯</button>
+    <button data-tus="geri" title="Geri" aria-label="Geri">◁</button>
+    <button id="kapatOynatici" title="Kapat" aria-label="Kapat">✕</button>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <script>
@@ -307,7 +337,8 @@
     if (!/^[sh]$/.test(mod) || !/^[a-z0-9]+(-[a-z0-9]+)+$/.test(alt) || !/^[A-Za-z0-9_-]{16,64}$/.test(sir)) {
       throw new Error('bozuk içerik');
     }
-    return 'https://' + alt + '.trycloudflare.com/giris?k=' + sir;
+    // Akış bu köke gömülür: kapı /k/<sır>/ altını uygulamaya aktarır.
+    return { taban: 'https://' + alt + '.trycloudflare.com/k/' + sir + '/', alt, sir };
   }
 
   async function linkiHazirla() {
@@ -317,9 +348,9 @@
     if (!muhur) { link = null; return; }
     if (link && link.muhur === muhur) return;
     try {
-      link = { muhur, url: await muhruAc(muhur) };
+      link = { muhur, ...(await muhruAc(muhur)) };
     } catch {
-      link = { muhur, url: null };
+      link = { muhur, taban: null };
     }
   }
 
@@ -327,7 +358,85 @@
     cikis('');
   });
 
+  // ---- Tam ekran oynatıcı (akışı kendi sayfamıza gömer) ----
+  const UDID = 'emulator-5554';            // tek AVD'nin sabit seri numarası
+  let ctlZaman = 0;
+
+  function embedUrl() {
+    const t = link.taban;                  // https://<alt>.trycloudflare.com/k/<sır>/
+    const u = new URL('embed.html', t);
+    const p = u.searchParams;
+    const o = new URL(t);
+    p.set('device', UDID);
+    p.set('host', o.hostname);
+    p.set('port', '443');
+    p.set('secure', 'true');
+    p.set('pathname', o.pathname);         // /k/<sır>/  → WebSocket buradan geçer, kapı eşler
+    p.set('codec', 'h264');                // emülatörde hızlı ve uyumlu
+    p.set('audio', 'true');
+    p.set('maxFps', '60');
+    p.set('bitrate', '8000000');
+    return u.toString();
+  }
+
+  async function ctl(yol) {
+    if (!link || !link.taban) return;
+    try { await fetch(link.taban + '_ctl/' + yol, { cache: 'no-store', mode: 'cors' }); } catch { /* yut */ }
+  }
+
+  function yonBildir() {
+    const a = (screen.orientation && typeof screen.orientation.angle === 'number')
+      ? screen.orientation.angle
+      : (typeof window.orientation === 'number' ? ((window.orientation % 360) + 360) % 360 : 0);
+    // Ekran açısı → cihaz açısı (ters yön): 90 çevirince telefon -90 dönmüş gibi görünür.
+    const now = Date.now();
+    if (now - ctlZaman < 250) return;      // savurmayı sınırla
+    ctlZaman = now;
+    ctl('yon?a=' + ((360 - a) % 360));
+  }
+
+  function oynaticiAc() {
+    if (!link || !link.taban) return;
+    $('ekran').src = embedUrl();
+    $('oynatici').hidden = false;
+    document.addEventListener('fullscreenchange', tamEkranKontrol);
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    if (screen.orientation && screen.orientation.addEventListener) {
+      screen.orientation.addEventListener('change', yonBildir);
+    } else {
+      window.addEventListener('orientationchange', yonBildir);
+    }
+    yonBildir();
+  }
+
+  function oynaticiKapat() {
+    $('oynatici').hidden = true;
+    $('ekran').src = 'about:blank';
+    if (screen.orientation && screen.orientation.removeEventListener) {
+      screen.orientation.removeEventListener('change', yonBildir);
+    } else {
+      window.removeEventListener('orientationchange', yonBildir);
+    }
+    document.removeEventListener('fullscreenchange', tamEkranKontrol);
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  function tamEkranKontrol() {
+    // Kullanıcı tam ekrandan çıkınca oynatıcıyı kapatma; sadece bırak.
+  }
+
+  $('acBtn').addEventListener('click', oynaticiAc);
+  $('kapatOynatici').addEventListener('click', oynaticiKapat);
+  document.querySelectorAll('#cubuk button[data-tus]').forEach((b) => {
+    b.addEventListener('click', () => ctl('tus?k=' + b.getAttribute('data-tus')));
+  });
+
   function cikis(mesaj) {
+    oynaticiKapat();
     clearTimeout(yoklamaZamani);
     run = null; durum = null; link = null;
     ayar = { repo: GIZLI && GIZLI.repo };
@@ -351,7 +460,6 @@
           ref: ayar.dal || 'main',
           inputs: {
             dakika: $('sure').value,
-            goruntu: document.querySelector('input[name=goruntu]:checked').value,
             anahtar: ayar.pub,
             apk_url: apk,
           },
@@ -459,6 +567,7 @@
     }
 
     if (run.status === 'completed') {
+      oynaticiKapat();
       const nedenler = { cancelled: 'Durduruldu.', success: 'Süre doldu.', failure: 'Hata ile bitti. Ayrıntılar GitHub\'da.', timed_out: 'Zaman aşımı.' };
       baslik.textContent = 'Oturum bitti';
       alt.textContent = nedenler[run.conclusion] || (run.conclusion || '');
@@ -496,12 +605,12 @@
       k.textContent = bitis ? sure(bitis - Date.now()) : '—';
       alt.append(k);
       $('adimlar').innerHTML = '';
-      if (link.url) {
-        ac.href = link.url;
+      if (link.taban) {
         ac.hidden = false;
+        $('oturumHata').textContent = '';
       } else {
         ac.hidden = true;
-        $('oturumHata').textContent = 'Oturum linki çözülemedi. Site şifresi yenilendiyse bu cihazda çıkış yapıp tekrar gir.';
+        $('oturumHata').textContent = 'Oturum çözülemedi. Site şifresi yenilendiyse bu cihazda çıkış yapıp tekrar gir.';
       }
     } else {
       const i = adimIndex();
