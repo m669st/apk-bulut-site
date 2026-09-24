@@ -1,0 +1,7 @@
+window.APK_BULUT = {
+  "repo": "m669st/apk-bulut",
+  "iter": 600000,
+  "salt": "oQnH8XQTJzC71+lMAzhyiA==",
+  "iv": "/2yNwwkr6NsMlzTD",
+  "veri": "5NtAu3V8dm0imKWTvfXWnUiIKhrwWpYbbc6KqDKplakjKDPGgO/I2HIAneFtBc9wmBzt1xQ7avZHvD7gHfD4HSNAqSKFIbV2IBdJWdUvo8+LflG5OzCr93vOHDWniU3uihF4Il1wBxuQXfROiJEjCikuElEzHVszqSYQM+kAGirVnN8I5d7Vokbq6SOvmuLFzrCIBT95/MLSNSbXAvS6oSAKXYQTMrEngc1dM3uvHIPRY+aQ/NncccrHjQMSCnzViXcsLilS2si88+229biKthiKhgW+Q6F8i8Uyfw394tC7KoQYRUVF6B0FBZ3pCQOth//iV67nJT0lahQg3AsPir6pwxCWiqcsD54gioeDFAvWX7QExVgOSIgZcMB3OApezeCDrhZwnFoEGzYTpRHkSm+2aKXQpBna0z3W+9C0Zoaj2bqhD0KlGINYUEIRDSVmJuQLi7LSWCD2sL3h/ubCBPriBTpytafhlQJ69HQAg2lEVobR2ZqcyvQHTERUobIAoJp56qzomuQ="
+};
