@@ -117,9 +117,6 @@
   .kalan { font-variant-numeric: tabular-nums; }
   .not { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
   .not a { color: inherit; }
-  ol.kurulum { padding-left: 20px; margin: 8px 0 0; font-size: 14px; color: var(--muted); }
-  ol.kurulum li { margin: 4px 0; }
-  ol.kurulum a { color: var(--accent); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -128,19 +125,14 @@
   <h1>APK Bulut</h1>
   <p class="sub">GitHub Actions üzerinde geçici Android oturumu</p>
 
-  <!-- Kurulum -->
+  <!-- Şifre (cihaz başına bir kez) -->
   <section id="kurulum" class="card" hidden>
-    <label for="repo">Depo (kullanıcı/depo)</label>
-    <input id="repo" placeholder="kullanici/apk-bulut" autocapitalize="off" autocomplete="off" spellcheck="false">
-    <label for="token">Erişim jetonu</label>
-    <input id="token" type="password" placeholder="github_pat_…" autocapitalize="off" autocomplete="off" spellcheck="false">
-    <ol class="kurulum">
-      <li><a id="jetonLink" target="_blank" rel="noopener">Jeton oluşturma sayfasını aç</a> (izinler hazır gelir).</li>
-      <li><b>Repository access</b> → <b>Only select repositories</b> → özel Android deposunu seç.</li>
-      <li><b>Generate token</b> → kopyala → buraya yapıştır.</li>
-    </ol>
-    <p class="not">Jeton yalnızca bu tarayıcıda saklanır, başka bir yere gönderilmez (sadece api.github.com).</p>
-    <button id="kaydet">Kaydet</button>
+    <form id="sifreForm">
+      <label for="sifre">Şifre</label>
+      <input id="sifre" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+      <button id="kaydet" type="submit">Giriş</button>
+    </form>
+    <p class="not">Bu cihazda bir kez sorulur.</p>
     <p class="hata" id="kurulumHata"></p>
   </section>
 
@@ -177,9 +169,10 @@
     <p class="not"><a id="runLink" target="_blank" rel="noopener">GitHub'da ayrıntılar</a></p>
   </section>
 
-  <button id="ayarlarBtn" class="link" hidden>Depo ve jeton ayarları</button>
+  <button id="ayarlarBtn" class="link" hidden>Bu cihazda çıkış yap</button>
 </main>
 
+<script src="config.js"></script>
 <script>
 (() => {
   const API = 'https://api.github.com';
@@ -194,12 +187,11 @@
     ['Görüntü hazırlanıyor', 'Görüntü hazırlanıyor'],
     ['hazir', 'Hazır'],
   ];
-  const JETON_URL = 'https://github.com/settings/personal-access-tokens/new'
-    + '?name=apk-bulut&description=APK%20Bulut%20baslatici&expires_in=90'
-    + '&actions=write&statuses=read&contents=read';
+  const GIZLI = window.APK_BULUT || null;   // config.js: depo + şifreli jeton
 
   const $ = (id) => document.getElementById(id);
   let ayar = oku();
+  if (GIZLI) ayar.repo = GIZLI.repo;
   let run = null;          // aktif iş akışı çalıştırması
   let durum = null;        // son commit durumu
   let yoklamaZamani = null;
@@ -227,13 +219,15 @@
     if (!res.ok) {
       const e = new Error(hataMetni(res.status));
       e.status = res.status;
+      // Kayıtlı jeton artık geçmiyorsa cihazdaki kaydı sil, şifreyi yeniden sor.
+      if (res.status === 401 && oku().token) cikis(e.message);
       throw e;
     }
     return res.json();
   }
 
   function hataMetni(kod) {
-    if (kod === 401) return 'Jeton geçersiz ya da süresi dolmuş.';
+    if (kod === 401) return 'Jeton geçersiz ya da süresi dolmuş. Bilgisayarda sifrele.js ile yenileyip siteyi tekrar gönder.';
     if (kod === 403) return 'Jetonun izni yetmiyor (Actions: yazma, Commit statuses: okuma gerekli) ya da istek sınırı aşıldı.';
     if (kod === 404) return 'Depo ya da iş akışı bulunamadı. Depo adı doğru mu, jeton bu depoyu seçiyor mu?';
     if (kod === 422) return 'İş akışı başlatılamadı. android.yml ana dalda mı?';
@@ -245,38 +239,63 @@
     $('ayarlarBtn').hidden = bolum === 'kurulum';
   }
 
-  // ---- Kurulum ----
-  $('jetonLink').href = JETON_URL;
-  $('kaydet').addEventListener('click', async () => {
-    const repo = $('repo').value.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/+$/, '');
-    const token = $('token').value.trim() || ayar.token || '';
+  // ---- Şifre ----
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+  async function jetonuCoz(sifre) {
+    const ham = await crypto.subtle.importKey('raw', new TextEncoder().encode(sifre), 'PBKDF2', false, ['deriveKey']);
+    const anahtar = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', salt: b64(GIZLI.salt), iterations: GIZLI.iter },
+      ham, { name: 'AES-GCM', length: 256 }, false, ['decrypt'],
+    );
+    const acik = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(GIZLI.iv) }, anahtar, b64(GIZLI.veri));
+    return new TextDecoder().decode(acik);
+  }
+
+  $('sifreForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
     $('kurulumHata').textContent = '';
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { $('kurulumHata').textContent = 'Depo "kullanıcı/depo" biçiminde olmalı.'; return; }
-    if (!token) { $('kurulumHata').textContent = 'Jeton gerekli.'; return; }
+    const sifre = $('sifre').value;
+    if (!sifre) return;
     $('kaydet').disabled = true;
-    const onceki = ayar;
-    ayar = { repo, token };
+    $('kaydet').textContent = 'Kontrol ediliyor…';
+    let token;
     try {
-      const bilgi = await gh('/repos/' + repo);
-      await gh('/repos/' + repo + '/actions/workflows/' + WF);
+      token = await jetonuCoz(sifre);
+    } catch {
+      $('kurulumHata').textContent = 'Şifre yanlış.';
+      $('kaydet').disabled = false;
+      $('kaydet').textContent = 'Giriş';
+      return;
+    }
+    ayar = { repo: GIZLI.repo, token };
+    try {
+      const bilgi = await gh('/repos/' + ayar.repo);
       ayar.dal = bilgi.default_branch || 'main';
       yaz(ayar);
-      $('token').value = '';
+      $('sifre').value = '';
       await aktifiBul();
     } catch (e) {
-      ayar = onceki;
+      ayar = { repo: GIZLI.repo };
       $('kurulumHata').textContent = e.message;
     } finally {
       $('kaydet').disabled = false;
+      $('kaydet').textContent = 'Giriş';
     }
   });
 
   $('ayarlarBtn').addEventListener('click', () => {
-    $('repo').value = ayar.repo || '';
-    $('token').value = '';
-    $('token').placeholder = ayar.token ? 'Kayıtlı jeton kullanılacak (değiştirmek için yapıştır)' : 'github_pat_…';
-    goster('kurulum');
+    cikis('');
   });
+
+  function cikis(mesaj) {
+    clearTimeout(yoklamaZamani);
+    run = null; durum = null;
+    ayar = { repo: GIZLI && GIZLI.repo };
+    try { localStorage.removeItem(ANAHTAR); } catch { /* yok say */ }
+    goster('kurulum');
+    $('kurulumHata').textContent = mesaj;
+  }
 
   // ---- Başlat ----
   $('baslatBtn').addEventListener('click', async () => {
@@ -341,8 +360,7 @@
       const r = await gh(runlarYolu(5));
       run = r.workflow_runs.find((x) => x.status !== 'completed') || null;
     } catch (e) {
-      goster('kurulum');
-      $('kurulumHata').textContent = e.message;
+      if (e.status !== 401) { goster('baslat'); $('baslatHata').textContent = e.message; }
       return;
     }
     if (run) { goster('oturum'); yokla(); } else { goster('baslat'); }
@@ -480,7 +498,11 @@
   });
 
   // ---- Açılış ----
-  if (ayar.repo && ayar.token) {
+  if (!GIZLI) {
+    goster('kurulum');
+    $('sifreForm').hidden = true;
+    $('kurulumHata').textContent = 'config.js bulunamadı. Bilgisayarda sifrele.js çalıştırıp siteyi tekrar gönder.';
+  } else if (ayar.token) {
     aktifiBul();
   } else {
     goster('kurulum');
