@@ -262,6 +262,9 @@
       <option value="6000000">6 Mbit/s</option>
       <option value="8000000">8 Mbit/s</option>
       <option value="12000000">12 Mbit/s</option>
+      <option value="20000000">20 Mbit/s</option>
+      <option value="30000000">30 Mbit/s</option>
+      <option value="50000000">50 Mbit/s (en yüksek)</option>
     </select>
     <label for="ayAnim">Android animasyonları</label>
     <select id="ayAnim">
@@ -292,6 +295,7 @@
     ['Android indiriliyor', 'Android indiriliyor'],
     ['Android açılıyor', 'Android açılıyor'],
     ['Uygulamalar kuruluyor', 'Uygulamalar kuruluyor'],
+    ['Performans hazırlığı', 'Performans hazırlığı'],
     ['Görüntü hazırlanıyor', 'Görüntü hazırlanıyor'],
     ['hazir', 'Hazır'],
   ];
@@ -451,7 +455,6 @@
     p.set('secure', 'true');
     p.set('pathname', o.pathname);         // /k/<sır>/  → WebSocket buradan geçer, kapı eşler
     p.set('codec', 'h264');                // emülatörde hızlı ve uyumlu
-    p.set('encoder', 'c2.android.avc.encoder');
     p.set('deviceKind', 'phone');          // dokunmatik mod (yoksa TV kumandası moduna düşer)
     p.set('audio', goruntu.ses);
     p.set('maxFps', goruntu.fps);
