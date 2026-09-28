@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
+<!-- Ana ekrana eklenince Safari/Chrome çubukları olmadan, uygulama gibi açılır (iPhone'da tam ekranın tek yolu). -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="APK Bulut">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>APK Bulut</title>
 <style>
   :root {
@@ -119,24 +126,38 @@
   .not a { color: inherit; }
   [hidden] { display: none !important; }
 
-  /* Tam ekran oynatıcı */
+  /* Tam ekran oynatıcı: ekranın tamamı Android. Gezinme Android'in kendi tuşlarıyla;
+     ayarlar ve kapatma kenara sürüklenebilen küçük düğmede. Çentik/ana ekran çizgisi alanı boş kalır. */
+  html.oynatiyor, html.oynatiyor body { overflow: hidden; overscroll-behavior: none; }
   #oynatici {
-    position: fixed; inset: 0; z-index: 9999;
-    background: #000; display: flex; flex-direction: column;
+    position: fixed; inset: 0; z-index: 9999; background: #000;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   }
-  #ekran { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: #000; }
-  #cubuk {
-    display: flex; justify-content: center; gap: 28px;
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-    background: #0a0a0a; border-top: 1px solid #1c1c1c;
+  #ekran { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+  #menuBtn {
+    position: fixed; z-index: 2; width: 34px; height: 34px; min-height: 0; margin: 0; padding: 0;
+    border-radius: 50%; border: 1px solid rgba(255, 255, 255, .22);
+    background: rgba(28, 28, 28, .6); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    color: #fff; font-size: 16px; font-weight: 600; line-height: 1; letter-spacing: 1px;
+    opacity: .65; touch-action: none; -webkit-tap-highlight-color: transparent;
   }
-  #cubuk button {
-    width: auto; min-height: 40px; margin: 0; padding: 6px 18px;
-    background: transparent; color: #e6e6e6; border: 0; border-radius: 8px;
-    font-size: 18px; line-height: 1; cursor: pointer;
+  #menuBtn:active, #menuBtn.suruklen { opacity: 1; }
+  #menuPerde { position: fixed; inset: 0; z-index: 3; background: rgba(0, 0, 0, .25); }
+  #menu {
+    position: fixed; z-index: 4; width: 212px; padding: 6px;
+    background: rgba(24, 24, 24, .96); border: 1px solid #2c2c2c; border-radius: 14px;
   }
-  #cubuk button:active { background: #222; }
-  #cubuk #kapatOynatici { color: #e0726b; margin-left: 12px; }
+  #menu button {
+    display: block; width: 100%; min-height: 44px; margin: 0; padding: 10px 12px;
+    background: transparent; color: #ececec; border: 0; border-radius: 9px;
+    font-size: 15px; font-weight: 500; text-align: left; -webkit-tap-highlight-color: transparent;
+  }
+  #menu button:active { background: #2a2a2a; }
+  #menu .tuslar { display: flex; gap: 4px; margin-bottom: 4px; border-bottom: 1px solid #2c2c2c; padding-bottom: 6px; }
+  #menu .tuslar button { flex: 1; text-align: center; font-size: 17px; padding: 10px 0; }
+  #menu #kapatOynatici { color: #e0726b; }
 
   /* Nötr ikincil düğme */
   button.notr {
@@ -163,11 +184,6 @@
     border: 1px solid var(--line); border-radius: 10px; font-weight: 500;
   }
   .hazirlar button[aria-pressed="true"] { border-color: var(--accent); outline: 1px solid var(--accent); }
-  /* Yatayken kontrol çubuğunu yana al ki ekranın tamamı video olsun */
-  @media (orientation: landscape) {
-    #oynatici { flex-direction: row; }
-    #cubuk { flex-direction: column; border-top: 0; border-left: 1px solid #1c1c1c; padding: 12px 8px; }
-  }
 </style>
 </head>
 <body>
@@ -216,18 +232,23 @@
     <p class="not"><a id="runLink" target="_blank" rel="noopener">GitHub'da ayrıntılar</a></p>
   </section>
 
+  <p class="not" id="ekleIpucu" hidden>Tam ekran için Safari'de <b>Paylaş → Ana Ekrana Ekle</b>'ye dokun, sonra ana ekrandaki APK Bulut simgesinden aç. Orada şifre bir kez daha sorulur.</p>
   <button id="ayarlarBtn" class="link" hidden>Bu cihazda çıkış yap</button>
 </main>
 
 <!-- Tam ekran oynatıcı: akış burada iframe ile gömülür -->
 <div id="oynatici" hidden>
   <iframe id="ekran" allow="autoplay; fullscreen; clipboard-write" title="Android"></iframe>
-  <div id="cubuk">
-    <button data-tus="son" title="Son uygulamalar" aria-label="Son uygulamalar">▢</button>
-    <button data-tus="ana" title="Ana ekran" aria-label="Ana ekran">◯</button>
-    <button data-tus="geri" title="Geri" aria-label="Geri">◁</button>
-    <button id="ayarCubukBtn" title="Görüntü ayarları" aria-label="Görüntü ayarları">⚙</button>
-    <button id="kapatOynatici" title="Kapat" aria-label="Kapat">✕</button>
+  <button id="menuBtn" type="button" aria-label="Menü" aria-haspopup="true" aria-expanded="false">•••</button>
+  <div id="menuPerde" hidden></div>
+  <div id="menu" hidden role="menu">
+    <div class="tuslar">
+      <button type="button" data-tus="geri" title="Geri" aria-label="Geri">◁</button>
+      <button type="button" data-tus="ana" title="Ana ekran" aria-label="Ana ekran">◯</button>
+      <button type="button" data-tus="son" title="Son uygulamalar" aria-label="Son uygulamalar">▢</button>
+    </div>
+    <button type="button" id="ayarCubukBtn" role="menuitem">Görüntü ayarları</button>
+    <button type="button" id="kapatOynatici" role="menuitem">Kapat</button>
   </div>
 </div>
 
@@ -242,9 +263,9 @@
     </div>
     <label for="ayCozunurluk">Android çözünürlüğü</label>
     <select id="ayCozunurluk">
-      <option value="432">Düşük · 432×936</option>
-      <option value="540">Orta · 540×1170</option>
-      <option value="720">Yüksek · 720×1560</option>
+      <option value="432">Düşük · 432 piksel genişlik</option>
+      <option value="540">Orta · 540 piksel genişlik</option>
+      <option value="720">Yüksek · 720 piksel genişlik</option>
     </select>
     <label for="ayFps">Kare hızı</label>
     <select id="ayFps">
@@ -348,9 +369,14 @@
     return 'GitHub hatası (' + kod + ').';
   }
 
+  // iPhone'da sayfa içinden tam ekran yok (yalnızca video); ana ekrana eklenen uygulama çubuksuz açılır.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const UYGULAMA = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+
   function goster(bolum) {
     for (const id of ['kurulum', 'baslat', 'oturum']) $(id).hidden = id !== bolum;
     $('ayarlarBtn').hidden = bolum === 'kurulum';
+    $('ekleIpucu').hidden = !(IOS && !UYGULAMA && bolum !== 'kurulum');
   }
 
   // ---- Şifre ----
@@ -541,12 +567,25 @@
   });
   ozetYaz();
 
+  // Telefonda Android ekranı görüntü alanının oranına ve boyutuna uydurulur: kenarlarda siyah bant kalmaz,
+  // 1 CSS pikseli = 1 dp olduğu için Android arayüzü telefonun kendi uygulamalarıyla aynı boyutta görünür.
+  // Masaüstünde (fare) standart telefon ekranı kalır.
+  function ekranUyumu() {
+    if (!window.matchMedia || !matchMedia('(pointer: coarse)').matches) return '';
+    const r = $('ekran').getBoundingClientRect();
+    const kisa = Math.min(r.width, r.height), uzun = Math.max(r.width, r.height);
+    if (!kisa || kisa > 600) return '';                                   // tablet ve büyük ekran: standart
+    const oran = Math.min(2.4, Math.max(1.5, uzun / kisa));
+    const dp = Math.min(480, Math.max(320, Math.round(kisa)));
+    return '&oran=' + oran.toFixed(3) + '&dp=' + dp;
+  }
+
   // Android tarafı ayarları (çözünürlük, animasyon) önce uygulanır; akış yeni boyutla başlar.
   let akisSayaci = 0;
   async function akisiBaslat() {
     const bu = ++akisSayaci;
     $('ekran').src = 'about:blank';
-    await Promise.all([ctl('ekran?g=' + goruntu.cozunurluk), ctl('anim?o=' + goruntu.anim)]);
+    await Promise.all([ctl('ekran?g=' + goruntu.cozunurluk + ekranUyumu()), ctl('anim?o=' + goruntu.anim)]);
     if (bu !== akisSayaci || $('oynatici').hidden) return;   // bu arada kapatıldı ya da yeniden başlatıldı
     $('ekran').src = embedUrl();
   }
@@ -565,10 +604,15 @@
   function oynaticiAc() {
     if (!link || !link.taban) return;
     $('oynatici').hidden = false;
+    document.documentElement.classList.add('oynatiyor');
+    menuKapat();
+    menuBtnYerlestir();
     document.addEventListener('fullscreenchange', tamEkranKontrol);
     // Tam ekran isteği kullanıcı tıklamasıyla eşzamanlı olmalı; bekleme öncesinde yapılır.
+    // (Android Chrome'da çalışır; iPhone'da sayfa içi tam ekran yok, ana ekran uygulaması kullanılır.)
+    let tamEkran = Promise.resolve();
     if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      tamEkran = document.documentElement.requestFullscreen().catch(() => {});
     }
     if (screen.orientation && screen.orientation.addEventListener) {
       screen.orientation.addEventListener('change', yonBildir);
@@ -576,11 +620,19 @@
       window.addEventListener('orientationchange', yonBildir);
     }
     yonBildir();
-    akisiBaslat();
+    // Android ekranı görüntü alanına göre boyutlanacağı için alan tam ekrana geçtikten sonra ölçülür.
+    const bu = akisSayaci;
+    Promise.race([tamEkran, bekle(1000)]).then(() => bekle(120)).then(() => {
+      if (bu !== akisSayaci || $('oynatici').hidden) return;
+      menuBtnYerlestir();
+      akisiBaslat();
+    });
   }
 
   function oynaticiKapat() {
     $('oynatici').hidden = true;
+    document.documentElement.classList.remove('oynatiyor');
+    menuKapat();
     $('ekran').src = 'about:blank';
     if (screen.orientation && screen.orientation.removeEventListener) {
       screen.orientation.removeEventListener('change', yonBildir);
@@ -599,8 +651,79 @@
 
   $('acBtn').addEventListener('click', oynaticiAc);
   $('kapatOynatici').addEventListener('click', oynaticiKapat);
-  document.querySelectorAll('#cubuk button[data-tus]').forEach((b) => {
-    b.addEventListener('click', () => ctl('tus?k=' + b.getAttribute('data-tus')));
+  document.querySelectorAll('#menu button[data-tus]').forEach((b) => {
+    b.addEventListener('click', () => { menuKapat(); ctl('tus?k=' + b.getAttribute('data-tus')); });
+  });
+
+  // ---- Menü düğmesi: dokununca menü, sürükleyince ekranın sağ/sol kenarına yapışır ----
+  const MENU_YER = 'apk-bulut-menu';
+  let menuYer = { sag: true, y: 0.42 };
+  try {
+    const k = JSON.parse(localStorage.getItem(MENU_YER));
+    if (k && typeof k.sag === 'boolean' && k.y >= 0 && k.y <= 1) menuYer = k;
+  } catch { /* yok say */ }
+
+  function menuBtnYerlestir() {
+    const b = $('menuBtn'), g = innerWidth, y = innerHeight;
+    const pay = 6, boyut = 34;
+    const cs = getComputedStyle($('oynatici'));
+    const sol = parseFloat(cs.paddingLeft) || 0, sag = parseFloat(cs.paddingRight) || 0;
+    const ust = (parseFloat(cs.paddingTop) || 0) + pay, alt = y - (parseFloat(cs.paddingBottom) || 0) - boyut - pay;
+    b.style.left = (menuYer.sag ? g - sag - boyut - pay : sol + pay) + 'px';
+    b.style.top = Math.round(Math.min(Math.max(menuYer.y * y - boyut / 2, ust), Math.max(ust, alt))) + 'px';
+  }
+  function menuAc() {
+    const b = $('menuBtn').getBoundingClientRect(), m = $('menu');
+    m.hidden = false; $('menuPerde').hidden = false;
+    $('menuBtn').setAttribute('aria-expanded', 'true');
+    const g = innerWidth, y = innerHeight, mg = m.offsetWidth || 212, my = m.offsetHeight || 200;
+    m.style.left = Math.round(menuYer.sag ? Math.max(8, b.left - mg - 8) : Math.min(g - mg - 8, b.right + 8)) + 'px';
+    m.style.top = Math.round(Math.min(Math.max(8, b.top + b.height / 2 - my / 2), Math.max(8, y - my - 8))) + 'px';
+  }
+  function menuKapat() {
+    $('menu').hidden = true; $('menuPerde').hidden = true;
+    $('menuBtn').setAttribute('aria-expanded', 'false');
+  }
+  $('menuPerde').addEventListener('click', menuKapat);
+  $('ayarCubukBtn').addEventListener('click', menuKapat);
+  // Döndürünce düğme kenarda kalsın, açık menü de düğmenin yanına taşınsın.
+  window.addEventListener('resize', () => {
+    if ($('oynatici').hidden) return;
+    menuBtnYerlestir();
+    if (!$('menu').hidden) menuAc();
+  });
+
+  let surukle = null;
+  $('menuBtn').addEventListener('pointerdown', (e) => {
+    surukle = { id: e.pointerId, x: e.clientX, y: e.clientY, tasindi: false };
+    try { $('menuBtn').setPointerCapture(e.pointerId); } catch { /* sürükleme yine çalışır */ }
+    e.preventDefault();
+  });
+  $('menuBtn').addEventListener('pointermove', (e) => {
+    if (!surukle || e.pointerId !== surukle.id) return;
+    if (!surukle.tasindi && Math.hypot(e.clientX - surukle.x, e.clientY - surukle.y) < 8) return;
+    surukle.tasindi = true;
+    $('menuBtn').classList.add('suruklen');
+    $('menuBtn').style.left = Math.round(e.clientX - 17) + 'px';
+    $('menuBtn').style.top = Math.round(e.clientY - 17) + 'px';
+  });
+  function surukleBitir(e, iptal) {
+    if (!surukle || e.pointerId !== surukle.id) return;
+    const tasindi = surukle.tasindi;
+    surukle = null;
+    $('menuBtn').classList.remove('suruklen');
+    if (tasindi && !iptal) {
+      menuYer = { sag: e.clientX > innerWidth / 2, y: Math.min(1, Math.max(0, e.clientY / innerHeight)) };
+      try { localStorage.setItem(MENU_YER, JSON.stringify(menuYer)); } catch { /* özel pencere */ }
+    }
+    menuBtnYerlestir();
+    if (!tasindi && !iptal) { if ($('menu').hidden) menuAc(); else menuKapat(); }
+  }
+  $('menuBtn').addEventListener('pointerup', (e) => surukleBitir(e, false));
+  $('menuBtn').addEventListener('pointercancel', (e) => surukleBitir(e, true));
+  // Klavyeyle (Enter/Boşluk) açma: işaretçi olayı olmadan gelen tıklama
+  $('menuBtn').addEventListener('click', (e) => {
+    if (e.detail === 0) { if ($('menu').hidden) menuAc(); else menuKapat(); }
   });
 
   function cikis(mesaj) {
