@@ -158,6 +158,12 @@
   #menu .tuslar { display: flex; gap: 4px; margin-bottom: 4px; border-bottom: 1px solid #2c2c2c; padding-bottom: 6px; }
   #menu .tuslar button { flex: 1; text-align: center; font-size: 17px; padding: 10px 0; }
   #menu #kapatOynatici { color: #e0726b; }
+  #bildirim {
+    position: fixed; z-index: 5; left: 50%; top: calc(env(safe-area-inset-top) + 12px); transform: translateX(-50%);
+    max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 10px;
+    background: rgba(24, 24, 24, .92); border: 1px solid #2c2c2c; color: #ececec; font-size: 14px;
+    pointer-events: none;
+  }
 
   /* Nötr ikincil düğme */
   button.notr {
@@ -166,14 +172,14 @@
   }
   button.notr span { color: var(--muted); font-weight: 400; }
 
-  /* Görüntü ayarları paneli (oynatıcının da üstünde) */
-  #ayarPanel {
+  /* Görüntü ayarları ve oyun kaydı panelleri (oynatıcının da üstünde) */
+  #ayarPanel, #kayitPanel {
     position: fixed; inset: 0; z-index: 10000;
     background: rgba(0, 0, 0, .55);
     display: flex; align-items: center; justify-content: center;
     padding: 16px;
   }
-  #ayarPanel .panel {
+  #ayarPanel .panel, #kayitPanel .panel {
     width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto;
     background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
   }
@@ -216,6 +222,7 @@
     <input id="apk" type="url" inputmode="url" placeholder="https://…/uygulama.apk" autocapitalize="off" spellcheck="false">
     <button id="baslatBtn">Başlat</button>
     <button type="button" class="notr ayarAcBtn">Görüntü ayarları · <span class="ayarOzet"></span></button>
+    <button type="button" class="notr kayitAcBtn">Oyun kaydı · <span class="kayitOzet"></span></button>
     <p class="hata" id="baslatHata"></p>
     <p class="not">Depodaki <code>apks/</code> klasöründeki APK'lar her oturumda otomatik kurulur. Hazırlık 3–5 dakika sürer.</p>
   </section>
@@ -226,8 +233,11 @@
     <p class="durum-alt" id="durumAlt"></p>
     <ul class="adimlar" id="adimlar"></ul>
     <button id="acBtn" class="btn" hidden>Android'i aç</button>
+    <p class="not" id="kayitDurum" hidden></p>
     <button id="ayarAcBtn" class="notr ayarAcBtn">Görüntü ayarları · <span class="ayarOzet"></span></button>
+    <button type="button" class="notr kayitAcBtn">Oyun kaydı · <span class="kayitOzet"></span></button>
     <button id="durdurBtn" class="ikincil">Durdur</button>
+    <p class="not" id="surumNot" hidden>Bu oturum açıldıktan sonra sistem güncellendi. Yeni sürüm için <b>Durdur</b>'a basıp yeniden başlat.</p>
     <p class="hata" id="oturumHata"></p>
     <p class="not"><a id="runLink" target="_blank" rel="noopener">GitHub'da ayrıntılar</a></p>
   </section>
@@ -241,14 +251,37 @@
   <iframe id="ekran" allow="autoplay; fullscreen; clipboard-write" title="Android"></iframe>
   <button id="menuBtn" type="button" aria-label="Menü" aria-haspopup="true" aria-expanded="false">•••</button>
   <div id="menuPerde" hidden></div>
+  <div id="bildirim" hidden role="status"></div>
   <div id="menu" hidden role="menu">
     <div class="tuslar">
       <button type="button" data-tus="geri" title="Geri" aria-label="Geri">◁</button>
       <button type="button" data-tus="ana" title="Ana ekran" aria-label="Ana ekran">◯</button>
       <button type="button" data-tus="son" title="Son uygulamalar" aria-label="Son uygulamalar">▢</button>
     </div>
+    <button type="button" id="kaydetBtn" role="menuitem" hidden>Şimdi kaydet</button>
     <button type="button" id="ayarCubukBtn" role="menuitem">Görüntü ayarları</button>
     <button type="button" id="kapatOynatici" role="menuitem">Kapat</button>
+  </div>
+</div>
+
+<!-- Oyun kaydı: Telegram botu kurulumu -->
+<div id="kayitPanel" hidden role="dialog" aria-modal="true" aria-labelledby="kayitBaslik">
+  <div class="panel">
+    <p class="durum-baslik" id="kayitBaslik">Oyun kaydı (Telegram)</p>
+    <div id="tgBagli" hidden>
+      <p class="durum-alt">Bağlı: <b id="tgAd"></b></p>
+      <p class="not">Oturum açılınca en son kayıt kendiliğinden yüklenir. Oynarken 15 dakikada bir, oynatıcıyı kapatınca ve Durdur'a basınca kaydedilir. Kayıtlar şifreli; anahtar site şifrenden gelir.</p>
+      <button type="button" id="tgKaldirBtn" class="ikincil">Bağlantıyı kaldır</button>
+    </div>
+    <div id="tgKur">
+      <p class="not">1. Telegram'da <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>'a <b>/newbot</b> yaz, bota bir ad ver.<br>2. Verdiği jetonu aşağıya yapıştır.</p>
+      <label for="tgJeton">Bot jetonu</label>
+      <input id="tgJeton" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="123456789:AA…">
+      <button type="button" id="tgBaglanBtn" class="btn">Bağlan</button>
+      <p class="not" id="tgAdim" hidden></p>
+    </div>
+    <p class="hata" id="tgHata"></p>
+    <button type="button" id="kayitKapatBtn" class="notr">Kapat</button>
   </div>
 </div>
 
@@ -463,6 +496,7 @@
   }
 
   $('ayarlarBtn').addEventListener('click', () => {
+    tgYaz(null);
     cikis('');
   });
 
@@ -567,7 +601,7 @@
   });
   ozetYaz();
 
-  // Telefonda Android ekranı görüntü alanının oranına ve boyutuna uydurulur: kenarlarda siyah bant kalmaz,
+  // Android tarafı  // Telefonda Android ekranı görüntü alanının oranına ve boyutuna uydurulur: kenarlarda siyah bant kalmaz,
   // 1 CSS pikseli = 1 dp olduğu için Android arayüzü telefonun kendi uygulamalarıyla aynı boyutta görünür.
   // Masaüstünde (fare) standart telefon ekranı kalır.
   function ekranUyumu() {
@@ -630,6 +664,10 @@
   }
 
   function oynaticiKapat() {
+    if (!$('oynatici').hidden && kayitOturum && kayitOturum.durum && kayitOturum.durum.geriYuklendi && run && run.status !== 'completed') {
+      kayitCtl('kaydet').catch(() => {});
+    }
+    $('bildirim').hidden = true;
     $('oynatici').hidden = true;
     document.documentElement.classList.remove('oynatiyor');
     menuKapat();
@@ -648,6 +686,215 @@
   function tamEkranKontrol() {
     // Kullanıcı tam ekrandan çıkınca oynatıcıyı kapatma; sadece bırak.
   }
+
+  // ---- Oyun kaydı (Telegram) ----
+  // Bot jetonu ve sohbet bu cihazda tutulur (ayrı anahtar: oturum düşünce silinmez). Şifreleme anahtarı
+  // site şifresiyle açılan özel anahtardan türetilir: her cihazda aynıdır, GitHub'a ya da Telegram'a gitmez.
+  const TG_ANAHTAR = 'apk-bulut-tg';
+  function tgOku() {
+    try {
+      const t = JSON.parse(localStorage.getItem(TG_ANAHTAR));
+      return t && typeof t.bot === 'string' && t.sohbet ? t : null;
+    } catch { return null; }
+  }
+  function tgYaz(t) {
+    try { if (t) localStorage.setItem(TG_ANAHTAR, JSON.stringify(t)); else localStorage.removeItem(TG_ANAHTAR); } catch { /* özel pencere */ }
+  }
+
+  // Telegram ön kontrol (OPTIONS) isteğine 501 dönüyor: yalnızca basit GET kullanılır.
+  async function tgCagir(jeton, yontem, params = {}) {
+    const u = new URL('https://api.telegram.org/bot' + jeton + '/' + yontem);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
+    const r = await fetch(u.toString(), { cache: 'no-store' });
+    const j = await r.json().catch(() => null);
+    if (!j || !j.ok) throw new Error(j && j.error_code === 401 ? 'Jeton geçersiz.' : (j && j.description) || 'Telegram yanıt vermedi.');
+    return j.result;
+  }
+
+  function kayitOzetYaz() {
+    const t = tgOku();
+    document.querySelectorAll('.kayitOzet').forEach((e) => { e.textContent = t ? '@' + t.ad : 'kurulu değil'; });
+    $('tgBagli').hidden = !t;
+    $('tgKur').hidden = !!t;
+    $('tgAd').textContent = t ? '@' + t.ad : '';
+    $('kaydetBtn').hidden = !t;
+  }
+
+  function kayitPanelAc() { $('tgHata').textContent = ''; $('tgAdim').hidden = true; kayitOzetYaz(); $('kayitPanel').hidden = false; }
+  function kayitPanelKapat() { $('kayitPanel').hidden = true; tgBekleme++; }
+  document.querySelectorAll('.kayitAcBtn').forEach((b) => b.addEventListener('click', kayitPanelAc));
+  $('kayitKapatBtn').addEventListener('click', kayitPanelKapat);
+  $('kayitPanel').addEventListener('click', (e) => { if (e.target === $('kayitPanel')) kayitPanelKapat(); });
+  $('tgKaldirBtn').addEventListener('click', () => { tgYaz(null); kayitOturum = null; kayitOzetYaz(); ciz(); });
+
+  let tgBekleme = 0;
+  $('tgBaglanBtn').addEventListener('click', async () => {
+    const jeton = $('tgJeton').value.trim();
+    $('tgHata').textContent = '';
+    if (!/^\d{5,}:[\w-]{30,}$/.test(jeton)) {
+      $('tgHata').textContent = 'Bu bir bot jetonu gibi görünmüyor (123456789:AA… biçiminde olmalı).';
+      return;
+    }
+    const bu = ++tgBekleme;
+    $('tgBaglanBtn').disabled = true;
+    $('tgBaglanBtn').textContent = 'Kontrol ediliyor…';
+    try {
+      const bot = await tgCagir(jeton, 'getMe');
+      // Sahibin bota yazdığı son özel mesajın sohbeti (bot yeni olduğu için başka yazan olmaz).
+      const bul = (g) => {
+        for (let i = g.length - 1; i >= 0; i--) {
+          const m = g[i].message || g[i].edited_message;
+          if (m && m.chat && m.chat.type === 'private') return m.chat;
+        }
+        return null;
+      };
+      let sohbet = bul(await tgCagir(jeton, 'getUpdates', { timeout: 0 }));
+      if (!sohbet) {
+        const a = $('tgAdim');
+        a.hidden = false;
+        a.textContent = '';
+        a.append('Şimdi Telegram\'da ');
+        const l = document.createElement('a');
+        l.href = 'https://t.me/' + bot.username;
+        l.target = '_blank';
+        l.rel = 'noopener';
+        l.textContent = '@' + bot.username;
+        a.append(l, ' botunu aç ve Başlat\'a bas. Burada bekliyorum…');
+        $('tgBaglanBtn').textContent = 'Mesaj bekleniyor…';
+        const son = Date.now() + 180000;
+        while (!sohbet && Date.now() < son && bu === tgBekleme) {
+          await bekle(2500);
+          sohbet = bul(await tgCagir(jeton, 'getUpdates', { timeout: 0 }));
+        }
+      }
+      if (bu !== tgBekleme) return;
+      if (!sohbet) throw new Error('Bottan mesaj gelmedi. Botu açıp Başlat\'a bastıktan sonra tekrar dene.');
+      await tgCagir(jeton, 'sendMessage', {
+        chat_id: sohbet.id,
+        text: 'APK Bulut oyun kayıtları bu sohbette şifreli olarak tutulacak. Sabitlenen mesaj en son kayıttır, silme.',
+      });
+      tgYaz({ bot: jeton, sohbet: String(sohbet.id), ad: bot.username });
+      $('tgJeton').value = '';
+      $('tgAdim').hidden = true;
+      kayitOturum = null;
+      kayitOzetYaz();
+      ciz();
+    } catch (e) {
+      if (bu === tgBekleme) $('tgHata').textContent = e.message;
+    } finally {
+      $('tgBaglanBtn').disabled = false;
+      $('tgBaglanBtn').textContent = 'Bağlan';
+    }
+  });
+
+  // ---- Oturumda kayıt: ayarları gizli kapıdan gönder, en son kaydı yükle, durumu izle ----
+  let kayitOturum = null;      // { taban, durum, hata }
+  let kayitZamani = null;
+
+  async function kayitAnahtari() {
+    const hk = await crypto.subtle.importKey('raw', b64u(ayar.jwk.d), 'HKDF', false, ['deriveBits']);
+    const bit = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode('apk-bulut-kayit-v1') }, hk, 256);
+    return btoa(String.fromCharCode(...new Uint8Array(bit)));
+  }
+
+  async function kayitCtl(yol, secenek = {}) {
+    const iptal = new AbortController();
+    const zaman = setTimeout(() => iptal.abort(), 20000);
+    try {
+      const r = await fetch(kayitOturum.taban + '_ctl/kayit/' + yol, { cache: 'no-store', mode: 'cors', signal: iptal.signal, ...secenek });
+      const j = await r.json().catch(() => null);
+      if (!j || (!r.ok && r.status !== 202)) throw new Error((j && j.hata) || 'kayıt servisi yanıt vermedi');
+      return j;
+    } finally {
+      clearTimeout(zaman);
+    }
+  }
+
+  async function kayitBagla() {
+    const t = tgOku();
+    if (!t || !link || !link.taban || !ayar.jwk) return;
+    if (kayitOturum && kayitOturum.taban === link.taban) return;
+    const bu = kayitOturum = { taban: link.taban, durum: null, hata: '' };
+    try {
+      // text/plain gövde: çapraz origin'de ön kontrol gerektirmeyen basit istek
+      await kayitCtl('ayarla', { method: 'POST', body: JSON.stringify({ bot: t.bot, sohbet: t.sohbet, anahtar: await kayitAnahtari() }) });
+      bu.durum = await kayitCtl('yukle');
+    } catch (e) {
+      bu.hata = 'Kayıt servisine bağlanılamadı (' + e.message + ').';
+    }
+    if (kayitOturum === bu) { ciz(); kayitIzle(); }
+  }
+
+  function kayitIzle() {
+    clearTimeout(kayitZamani);
+    const bu = kayitOturum;
+    if (!bu || bu.hata || !run || run.status === 'completed') return;
+    kayitZamani = setTimeout(async () => {
+      try { bu.durum = await kayitCtl('durum'); } catch { /* geçici */ }
+      if (kayitOturum !== bu) return;
+      ciz();
+      kayitIzle();
+    }, bu.durum && bu.durum.islem ? 2000 : 20000);
+  }
+
+  // Bu oturumda Android'e dokunmadan önce kayıt yükleniyor mu?
+  const kayitYukleniyor = () => !!(kayitOturum && !kayitOturum.hata &&
+    (!kayitOturum.durum || kayitOturum.durum.islem === 'geri'));
+
+  function saat(iso) {
+    return new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function kayitDurumYaz() {
+    const e = $('kayitDurum');
+    const k = kayitOturum;
+    e.hidden = !k;
+    if (!k) return;
+    const d = k.durum;
+    if (k.hata) e.textContent = k.hata;
+    else if (!d || d.islem === 'geri') e.textContent = 'Kayıt yükleniyor' + (d && d.asama ? ' · ' + d.asama : '…');
+    else if (d.islem === 'kaydet') e.textContent = 'Kaydediliyor' + (d.asama ? ' · ' + d.asama : '…');
+    else if (d.sonuc && !d.sonuc.basari) e.textContent = 'Kayıt: ' + d.sonuc.mesaj;
+    else e.textContent = d.sonKayit ? 'Son kayıt: ' + saat(d.sonKayit) : 'Henüz kayıt yok; oynadıkça kaydedilecek.';
+  }
+
+  // Kaydet ve bitmesini bekle (en fazla sn). Sonuç: { basari, mesaj } ya da null (servis yok).
+  async function kaydetVeBekle(sn) {
+    const bu = kayitOturum;
+    if (!bu || bu.hata || !bu.durum || !bu.durum.geriYuklendi) return null;
+    const basla = Date.now();
+    try {
+      await kayitCtl('kaydet');
+      while (Date.now() - basla < sn * 1000) {
+        await bekle(1500);
+        const d = bu.durum = await kayitCtl('durum');
+        if (!d.islem && d.sonuc && Date.parse(d.sonuc.zaman) >= basla - 2000) return d.sonuc;
+      }
+    } catch (e) {
+      return { basari: false, mesaj: e.message };
+    }
+    return { basari: false, mesaj: 'zaman aşımı' };
+  }
+
+  let bildirimZamani = null;
+  function bildir(metin, sure_) {
+    const b = $('bildirim');
+    clearTimeout(bildirimZamani);
+    b.textContent = metin;
+    b.hidden = false;
+    if (sure_) bildirimZamani = setTimeout(() => { b.hidden = true; }, sure_);
+  }
+
+  $('kaydetBtn').addEventListener('click', async () => {
+    menuKapat();
+    if (!kayitOturum || !kayitOturum.durum) { bildir('Kayıt servisi bu oturumda hazır değil', 3000); return; }
+    bildir('Kaydediliyor…');
+    const s = await kaydetVeBekle(240);
+    bildir(!s ? 'Kayıt servisi hazır değil' : s.basari ? (s.mesaj === 'Değişiklik yok' ? 'Değişiklik yok, kayıt güncel' : 'Kaydedildi') : 'Kayıt hatası: ' + s.mesaj, 3500);
+    ciz();
+  });
+  kayitOzetYaz();
 
   $('acBtn').addEventListener('click', oynaticiAc);
   $('kapatOynatici').addEventListener('click', oynaticiKapat);
@@ -783,6 +1030,11 @@
   $('durdurBtn').addEventListener('click', async () => {
     if (!run) return;
     $('durdurBtn').disabled = true;
+    if (kayitOturum && kayitOturum.durum && kayitOturum.durum.geriYuklendi) {
+      $('durdurBtn').textContent = 'Kaydediliyor…';
+      const s = await kaydetVeBekle(180);
+      if (s && !s.basari) $('oturumHata').textContent = 'Kaydedilemedi: ' + s.mesaj;
+    }
     try {
       await gh('/repos/' + ayar.repo + '/actions/runs/' + run.id + '/cancel', { method: 'POST' });
       durduruluyor = true;
@@ -805,11 +1057,28 @@
     if (run) { goster('oturum'); yokla(); } else { goster('baslat'); }
   }
 
+  // Oturum, başlatıldığı andaki depo koduyla çalışır; sonradan gönderilen düzeltmeler açık oturuma gelmez.
+  // Dalın son commit'i oturumunkinden farklıysa uyarılır.
+  const dalBasi = { sha: null, zaman: 0 };
+  async function dalBasiniYenile() {
+    if (Date.now() - dalBasi.zaman < 60000) return;
+    dalBasi.zaman = Date.now();
+    const yol = API + '/repos/' + ayar.repo + '/commits/' + encodeURIComponent(ayar.dal || 'main');
+    for (const yetki of [{ Authorization: 'Bearer ' + ayar.token }, {}]) {   // jetonun içerik izni yoksa: herkese açık depo
+      try {
+        const r = await fetch(yol, { cache: 'no-store', headers: { Accept: 'application/vnd.github.sha', ...yetki } });
+        const sha = r.ok ? (await r.text()).trim() : '';
+        if (/^[0-9a-f]{40}$/.test(sha)) { dalBasi.sha = sha; return; }
+      } catch { /* yok say: uyarı gösterilmez */ }
+    }
+  }
+
   async function yokla() {
     clearTimeout(yoklamaZamani);
     if (!run) return;
     try {
       run = await gh('/repos/' + ayar.repo + '/actions/runs/' + run.id);
+      if (run.status !== 'completed') await dalBasiniYenile();
       const liste = await gh('/repos/' + ayar.repo + '/commits/' + run.head_sha + '/statuses?per_page=100');
       durum = liste.find((s) => s.context === 'android/' + run.id) || null;
       await linkiHazirla();
@@ -847,6 +1116,8 @@
     if ($('oturum').hidden) return;
     const baslik = $('durumBaslik'), alt = $('durumAlt'), ac = $('acBtn');
     $('runLink').hidden = !run;
+    $('surumNot').hidden = true;
+    kayitDurumYaz();
     if (run) $('runLink').href = run.html_url;
 
     if (!run) {
@@ -881,6 +1152,7 @@
     }
 
     $('durdurBtn').hidden = false;
+    $('surumNot').hidden = !(dalBasi.sha && run.head_sha && run.head_sha !== dalBasi.sha);
     $('durdurBtn').disabled = durduruluyor;
     $('durdurBtn').textContent = durduruluyor ? 'Durduruluyor…' : 'Durdur';
 
@@ -898,6 +1170,9 @@
       $('adimlar').innerHTML = '';
       if (link.taban) {
         ac.hidden = false;
+        kayitBagla();
+        ac.disabled = kayitYukleniyor();
+        ac.textContent = ac.disabled ? 'Kayıt yükleniyor…' : 'Android\'i aç';
         $('oturumHata').textContent = '';
       } else {
         ac.hidden = true;
